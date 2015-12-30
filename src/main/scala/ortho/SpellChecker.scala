@@ -19,6 +19,8 @@ object SpellChecker {
   type OccurrenceMap = Map[String, Int]
   type WordPairSeq = Seq[(String, String)]
 
+  final val NonWordRegex = """([ˆ.,_#$!?*|"]+)""".r
+
   var occurrenceMap: OccurrenceMap = Map.empty[String, Int]
 
   /**
@@ -32,7 +34,7 @@ object SpellChecker {
   def countOccurrences(words: MatchIterator): OccurrenceMap = {
     val mmap = MMap.empty[String, Int]
     while (words.hasNext) {
-      val word = words.next()
+      val word = words.next().toLowerCase
       mmap.update(word, mmap.getOrElse(word, 0) + 1)
     }
     mmap.toMap
@@ -137,9 +139,13 @@ object SpellChecker {
   /**
    * If there are more than one candidate we select the one with the highest occurrence count.
    */
-  def selectCandidate(word: String): String = {
-    candidates(word).foldLeft((-1, word))((max, word) => if (occurrenceMap(word) > max._1) (occurrenceMap(word), word) else max)._2
-  }
+  def check(word: String): String =
+    if (word.head.isUpper) {
+      val candidate = candidates(word.toLowerCase).foldLeft((-1, word.toLowerCase))((max, w) => if (occurrenceMap(w) > max._1) (occurrenceMap(w), w) else max)._2
+      if (word.last.isUpper) candidate.toUpperCase
+      else candidate.head.toUpper + candidate.tail
+    } else
+      candidates(word).foldLeft((-1, word))((max, w) => if (occurrenceMap(w) > max._1) (occurrenceMap(w), w) else max)._2
 
   // TODO (performance): no reload needed if training file is not changed between runs
   def initialize(fileName: String) = {
@@ -155,10 +161,22 @@ object SpellChecker {
   def convert(line: String, fileType: String, ln: Int): LineResult = {
     var updatedWords = Seq.empty[WordPair]
     val updatedLine = (line.split(" ") map { word: String =>
-      val result = selectCandidate(word)
-      println(s"WORD: $word : $result")
-      if (word != result) updatedWords = updatedWords :+ WordPair(word, result)
-      result
+      if (word.length < 2 || !word.head.isLetter) word
+      else {
+        val (washed, left, right) =
+          try {
+            OrthoPlugin.wash(word)
+          } catch {
+            case e: Exception =>
+              // nothing to do but to ignore and continue with next word
+              (word, "", "")
+          }
+
+        val result = check(washed)
+        if (result != washed) updatedWords = updatedWords :+ WordPair(washed, result)
+        left + result + right
+      }
+
     }).mkString(" ")
 
     LineResult(original = line, updated = updatedLine, words = updatedWords, lineNumber = ln)

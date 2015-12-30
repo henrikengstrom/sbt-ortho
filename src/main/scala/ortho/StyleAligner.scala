@@ -71,19 +71,6 @@ object StyleAligner {
     lineResult
   }
 
-  /*
-   * Remove any non-letters from the "words" and return the cleaned words together with its non-letter characters.
-   * E.g. Passing in ("**BOLD*") will return ("BOLD", "**", "*")
-   */
-  private def wash(s: String, left: String = "", right: String = ""): (String, String, String) = (s.head.isLetter, s.last.isLetter) match {
-    case (true, true)  => (s, left, right) //right now we don't handle non-letter chars inside of words
-    case (false, true) => wash(s.tail, left + s.head, right)
-    case (true, false) => wash(s.substring(0, s.length - 1), left, right + s.last)
-    case (false, false) =>
-      val sMod = s.tail
-      wash(sMod.substring(0, sMod.length - 1), left + s.head, right + s.last)
-  }
-
   private def convertText(line: String, ln: Int): LineResult = {
     var updatedWords = Seq.empty[WordPair]
     val words: Seq[String] =
@@ -122,14 +109,10 @@ object StyleAligner {
       if (word.head.isUpper) {
         val result = dictionary.getOrElse(word.toLowerCase, word)
         // if both first and last chars in word is upper case we assume that the whole word should be upper cased
-        if (word.last.isUpper) {
-          result.toUpperCase
-        } else {
-          result.head.toUpper + result.tail
-        }
-      } else {
+        if (word.last.isUpper) result.toUpperCase
+        else result.head.toUpper + result.tail
+      } else
         dictionary.getOrElse(word, word)
-      }
     }
 
 }

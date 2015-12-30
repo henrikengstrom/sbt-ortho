@@ -58,6 +58,7 @@ object OrthoPlugin extends AutoPlugin {
     }
     log.info("")
 
+    SpellChecker.initialize(trainingFile.value)
     val spellingReport = traverseFiles(directory = baseDirectory.value, rewriteFiles = false)(SpellChecker.convert)
     log.info("ORTHO SPELLING REPORT FOR PROJECT FILES")
     if (spellingReport.isEmpty)
@@ -120,12 +121,12 @@ object OrthoPlugin extends AutoPlugin {
       } else {
         if (lines.nonEmpty) {
           var localReports = Seq.empty[String]
-          lines filter { lr => lr.original != lr.updated } foreach { lineReport =>
+          lines filter { lr => lr.words.nonEmpty } foreach { lineReport =>
             localReports = localReports :+ lineReport.format
           }
 
           if (localReports.nonEmpty) {
-            reports = reports :+ s"*** FILE: ${fi.file.getAbsolutePath}"
+            reports = reports :+ s"FILE: ${fi.file.getAbsolutePath}"
             reports = reports ++ localReports
           }
         }
@@ -135,6 +136,18 @@ object OrthoPlugin extends AutoPlugin {
     reports
   }
 
+  /**
+   * Remove any non-letters from the "words" and return the cleaned words together with its non-letter characters.
+   * E.g. Passing in ("**BOLD*") will return ("BOLD", "**", "*")
+   */
+  def wash(s: String, left: String = "", right: String = ""): (String, String, String) = (s.head.isLetter, s.last.isLetter) match {
+    case (true, true)  => (s, left, right) //right now we don't handle non-letter chars inside of words
+    case (false, true) => wash(s.tail, left + s.head, right)
+    case (true, false) => wash(s.substring(0, s.length - 1), left, right + s.last)
+    case (false, false) =>
+      val sMod = s.tail
+      wash(sMod.substring(0, sMod.length - 1), left + s.head, right + s.last)
+  }
 
   case class LineResult(original: String, updated: String, words: Seq[WordPair], lineNumber: Int) {
     def format: String = s"#$lineNumber : " + words.mkString(", ")

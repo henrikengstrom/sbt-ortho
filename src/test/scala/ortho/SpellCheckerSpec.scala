@@ -33,6 +33,7 @@ class SpellCheckerSpec extends WordSpecLike with Matchers {
     "fix misspelled words that exist in dictionary" in {
       val result = SpellChecker.convert("serious seriuos sreiuos", "", 1)
       result.updated should equal("serious serious serious")
+      println(">>>>> " + result.words)
       result.words.size should be(2)
     }
 
@@ -42,9 +43,15 @@ class SpellCheckerSpec extends WordSpecLike with Matchers {
       result.words.size should be(1)
     }
 
-    "fix misspelled code" in {
-      val result = SpellChecker.convert("* Analyze thsi and look for colors please.", "", 1)
-      result.updated should equal("* Analyze this and look for colors please.")
+    "find misspelled words in comments" in {
+      val result1 = SpellChecker.convert("* Analyze thsi and look for colros please.", "", 1)
+      result1.updated should equal("* Analyze this and look for colors please.")
+      result1.words.size should be(2)
+    }
+
+    "find misspelled code" in {
+      val result = SpellChecker.convert("""val analyseThis = "Some fulfill their golas"""", "", 1)
+      result.updated should equal("""val analyseThis = "Some fulfill their goals"""")
       result.words.size should be(1)
     }
   }
