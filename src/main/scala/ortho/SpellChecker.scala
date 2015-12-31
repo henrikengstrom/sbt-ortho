@@ -1,7 +1,5 @@
 package ortho
 
-import ortho.OrthoPlugin.{ FileInfo, LineResult, WordPair }
-
 import scala.collection.mutable.{ Map => MMap }
 import scala.io.Source
 import scala.util.matching.Regex
@@ -11,15 +9,13 @@ import scala.util.matching.Regex.MatchIterator
  * Simple spell checker. Based on the ideas in Peter Norvig's blog post here: http://norvig.com/spell-correct.html
  * Inspiration for Scala implementation: http://theyougen.blogspot.com/2009/12/peter-norvigs-spelling-corrector-in.html
  */
-object SpellChecker {
+object SpellChecker extends CheckerBase {
   // Adjust the alphabet after language being spell checked - right now it expects US English
   val alphabet = ('a' to 'z').toSeq
   val wordsRegex: Regex = ("[%s]+" format alphabet.mkString).r
 
   type OccurrenceMap = Map[String, Int]
   type WordPairSeq = Seq[(String, String)]
-
-  final val NonWordRegex = """([ˆ.,_#$!?*|"]+)""".r
 
   var occurrenceMap: OccurrenceMap = Map.empty[String, Int]
 
@@ -124,7 +120,7 @@ object SpellChecker {
     for {
       oneOffSeq <- oneOffVariations(word)
       twoOffSeq <- oneOffVariations(oneOffSeq)
-      // existingTwoOffWords <- occurrenceMap.get(twoOffSeq) // performance optimization, only use real words for the two off words
+      existingTwoOffWords <- occurrenceMap.get(twoOffSeq) // performance optimization, only use real words for the two off words
     } yield twoOffSeq
 
   def selectNonEmpty[T](candidates: Seq[T], others: => Seq[T]): Seq[T] = if (candidates.isEmpty) others else candidates
@@ -138,12 +134,16 @@ object SpellChecker {
 
   /**
    * If there are more than one candidate we select the one with the highest occurrence count.
+   * Note: will only operate on words with less than 15 characters for performance/memory reasons.
    */
   def check(word: String): String =
-    if (word.head.isUpper) {
-      val candidate = candidates(word.toLowerCase).foldLeft((-1, word.toLowerCase))((max, w) => if (occurrenceMap(w) > max._1) (occurrenceMap(w), w) else max)._2
-      if (word.last.isUpper) candidate.toUpperCase
-      else candidate.head.toUpper + candidate.tail
+    if (word.isEmpty) word
+    else if (word.head.isUpper) {
+      val result = candidates(word.toLowerCase).foldLeft((-1, word.toLowerCase))((max, w) => if (occurrenceMap(w) > max._1) (occurrenceMap(w), w) else max)._2
+      // try to preserve case
+      if (result == word) word
+      else if (word.last.isUpper) result.toUpperCase
+      else result.head.toUpper + result.tail
     } else
       candidates(word).foldLeft((-1, word))((max, w) => if (occurrenceMap(w) > max._1) (occurrenceMap(w), w) else max)._2
 
@@ -154,31 +154,8 @@ object SpellChecker {
     occurrenceMap = countOccurrences(words(Source.fromInputStream(this.getClass.getResourceAsStream(fileName)).getLines().mkString("\n")))
   }
 
-  def checkFiles(filesInfo: Seq[FileInfo], rewriteFiles: Boolean): Seq[String] = {
-    Seq.empty[String]
-  }
-
-  def convert(line: String, fileType: String, ln: Int): LineResult = {
-    var updatedWords = Seq.empty[WordPair]
-    val updatedLine = (line.split(" ") map { word: String =>
-      if (word.length < 2 || !word.head.isLetter) word
-      else {
-        val (washed, left, right) =
-          try {
-            OrthoPlugin.wash(word)
-          } catch {
-            case e: Exception =>
-              // nothing to do but to ignore and continue with next word
-              (word, "", "")
-          }
-
-        val result = check(washed)
-        if (result != washed) updatedWords = updatedWords :+ WordPair(washed, result)
-        left + result + right
-      }
-
-    }).mkString(" ")
-
-    LineResult(original = line, updated = updatedLine, words = updatedWords, lineNumber = ln)
+  def inspect(line: String, fileType: String, ln: Int): LineResult = fileType match {
+    case `ScalaFile` | `JavaFile`    => inspectSource(line, ln, check)
+    case `TextFile` | `MarkdownFile` => inspectText(line, ln, check)
   }
 }

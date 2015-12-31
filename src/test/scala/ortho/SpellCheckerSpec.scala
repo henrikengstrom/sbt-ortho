@@ -31,28 +31,33 @@ class SpellCheckerSpec extends WordSpecLike with Matchers {
     }
 
     "fix misspelled words that exist in dictionary" in {
-      val result = SpellChecker.convert("serious seriuos sreiuos", "", 1)
+      val result = SpellChecker.inspect("serious seriuos sreiuos", "txt", 1)
       result.updated should equal("serious serious serious")
-      println(">>>>> " + result.words)
       result.words.size should be(2)
     }
 
     "spell check UK ENG to US ENG" in {
-      val result = SpellChecker.convert("colour", "", 1)
+      val result = SpellChecker.inspect("colour", "txt", 1)
       result.updated should equal("color")
       result.words.size should be(1)
     }
 
     "find misspelled words in comments" in {
-      val result1 = SpellChecker.convert("* Analyze thsi and look for colros please.", "", 1)
+      val result1 = SpellChecker.inspect("* Analyze thsi and look for colros please.", "scala", 1)
       result1.updated should equal("* Analyze this and look for colors please.")
       result1.words.size should be(2)
     }
 
     "find misspelled code" in {
-      val result = SpellChecker.convert("""val analyseThis = "Some fulfill their golas"""", "", 1)
+      val result = SpellChecker.inspect("""val analyseThis = "Some fulfill their golas"""", "scala", 1)
       result.updated should equal("""val analyseThis = "Some fulfill their goals"""")
       result.words.size should be(1)
+    }
+
+    "ignore text chunks with non-letters" in {
+      val result = SpellChecker.inspect("""[pattern group exclude example](../../../test/scala/docs/ConfigurationDocsSpec.scala) { #pattern-group-exclude }""", "txt", 1)
+      result.updated should equal("""[pattern group exclude example](../../../test/scala/docs/ConfigurationDocsSpec.scala) { #pattern-group-exclude }""")
+      result.words should be(empty)
     }
   }
 }
