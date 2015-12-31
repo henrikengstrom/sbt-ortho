@@ -16,7 +16,7 @@ Add the plugin to your `project/plugins.sbt` file:
         url("http://dl.bintray.com/h3nk3/sbt-plugins/"))(
           Resolver.ivyStylePatterns)
 
-    addSbtPlugin("org.h3nk3" % "sbt-ortho" % "0.1.0")
+    addSbtPlugin("org.h3nk3" % "sbt-ortho" % "0.1.1")
 
 ## Tasks
 
